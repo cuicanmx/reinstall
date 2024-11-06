@@ -2672,7 +2672,6 @@ partman-cros
 partman-iscsi
 partman-jfs
 partman-md
-partman-xfs
 rescue-check
 wpasupplicant-udeb
 lilo-installer
@@ -2688,7 +2687,6 @@ firewire-core-modules-$kver-di
 usb-storage-modules-$kver-di
 isofs-modules-$kver-di
 jfs-modules-$kver-di
-xfs-modules-$kver-di
 loop-modules-$kver-di
 pata-modules-$kver-di
 sata-modules-$kver-di
