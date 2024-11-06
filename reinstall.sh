@@ -3,13 +3,12 @@
 # shellcheck disable=SC2086
 
 set -eE
-confhome=https://raw.githubusercontent.com/cuicanmx/reinstall/main
-confhome_cn=https://www.ghproxy.cc/https://raw.githubusercontent.com/cuicanmx/reinstall/main
-# confhome_cn=https://jihulab.com/bin456789/reinstall/-/raw/main
+confhome=https://raw.githubusercontent.com/bin456789/reinstall/main
+confhome_cn=https://jihulab.com/bin456789/reinstall/-/raw/main
+# confhome_cn=https://mirror.ghproxy.com/https://raw.githubusercontent.com/bin456789/reinstall/main
 
 # 用于判断 reinstall.sh 和 trans.sh 是否兼容
-SCRIPT_VERSION=4BACD833-A585-23BA-6CBB-9AA4E08E0002
-DEFAULT_PASSWORD=123@@@
+SCRIPT_VERSION=4BACD833-A585-23BA-6CBB-9AA4E08E0001
 
 # https://www.gnu.org/software/gettext/manual/html_node/The-LANGUAGE-variable.html
 export LC_ALL=C
@@ -18,8 +17,8 @@ export LC_ALL=C
 # 不要漏了最后的 $PATH，否则会找不到 windows 系统程序例如 diskpart
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH
 
-# 记录日志，过滤含有 password 的行
-exec > >(tee >(grep -iv password >>/reinstall.log)) 2>&1
+# 记录日志
+exec > >(exec tee /reinstall.log) 2>&1
 THIS_SCRIPT=$(readlink -f "$0")
 trap 'trap_err $LINENO $?' ERR
 
@@ -33,37 +32,32 @@ trap_err() {
 
 usage_and_exit() {
     if is_in_windows; then
-        reinstall_____='.\reinstall.bat'
+        reinstall____=' reinstall.bat'
     else
-        reinstall_____=' ./reinstall.sh'
+        reinstall____='./reinstall.sh'
     fi
     cat <<EOF
-Usage: $reinstall_____ centos      9
-                       anolis      7|8
-                       alma        8|9
-                       rocky       8|9
-                       redhat      8|9 --img='http://xxx.com/xxx.qcow2'
-                       opencloudos 8|9
-                       oracle      7|8|9
-                       fedora      40|41
-                       nixos       24.05
-                       debian      9|10|11|12
-                       openeuler   20.03|22.03|24.03
-                       alpine      3.17|3.18|3.19|3.20
-                       opensuse    15.5|15.6|tumbleweed
-                       ubuntu      16.04|18.04|20.04|22.04|24.04 [--minimal]
-                       kali
-                       arch
-                       gentoo
-                       dd          --img='http://xxx.com/xxx.raw' (supports raw vhd gzip xz)
-                       windows     --image-name='windows xxx yyy' --lang=xx-yy
-                       windows     --image-name='windows xxx yyy' --iso='http://xxx.com/xxx.iso'
-                       netboot.xyz
-
-       Options:        [--ssh-port PORT]
-                       [--rdp-port PORT]
-                       [--web-port PORT]
-                       [--allow-ping]
+Usage: $reinstall____ centos      9
+                      anolis      7|8
+                      alma        8|9
+                      rocky       8|9
+                      redhat      8|9   --img='http://xxx.com/xxx.qcow2'
+                      opencloudos 8|9
+                      oracle      7|8|9
+                      fedora      39|40
+                      nixos       24.05
+                      debian      9|10|11|12
+                      openeuler   20.03|22.03|24.03
+                      alpine      3.17|3.18|3.19|3.20
+                      opensuse    15.5|15.6|tumbleweed
+                      ubuntu      16.04|18.04|20.04|22.04|24.04 [--minimal]
+                      kali
+                      arch
+                      gentoo
+                      dd          --img='http://xxx.com/xxx.raw'  (supports raw vhd gzip xz)
+                      windows     --image-name='windows xxx yyy'  --lang=xx-yy
+                      windows     --image-name='windows xxx yyy'  --iso='http://xxx.com/xxx.iso'
+                      netboot.xyz
 
 Manual: https://github.com/bin456789/reinstall
 
@@ -73,16 +67,15 @@ EOF
 
 info() {
     upper=$(to_upper <<<"$@")
-    echo_color_text '\e[32m' "***** $upper *****" >&2
+    echo_color_text '\e[32m' "***** $upper *****"
 }
 
 warn() {
-    echo_color_text '\e[33m' "Warning: $*" >&2
+    echo_color_text '\e[33m' "Warning: $*"
 }
 
 error() {
-    echo_color_text '\e[31m' "***** ERROR *****" >&2
-    echo_color_text '\e[31m' "Error: $*" >&2
+    echo_color_text '\e[31m' "Error: $*"
 }
 
 echo_color_text() {
@@ -201,14 +194,6 @@ is_use_firmware() {
     [ "$nextos_distro" = debian ] && ! is_virt
 }
 
-is_digit() {
-    [[ "$1" =~ ^[0-9]+$ ]]
-}
-
-is_port_valid() {
-    is_digit "$1" && [ "$1" -ge 1 ] && [ "$1" -le 65535 ]
-}
-
 get_host_by_url() {
     cut -d/ -f3 <<<$1
 }
@@ -292,21 +277,24 @@ test_url_real() {
     if [ -n "$expect_types" ]; then
         install_pkg file
         real_type=$(file_enhanced $tmp_file)
-        echo "File type: $real_type"
+        echo "$real_type"
 
-        for type in $expect_types; do
-            if [[ ."$real_type" = *."$type" ]]; then
-                # 如果要设置变量
-                if [ -n "$var_to_eval" ]; then
-                    IFS=. read -r "${var_to_eval?}" "${var_to_eval}_warp" <<<"$real_type"
-                fi
-                return
-            fi
-        done
+        # 期待值没有.表示要只需判断外侧
+        if ! grep -Fq . <<<"$expect_types"; then
+            real_type=$(echo "$real_type" | cut -d. -f2-)
+        fi
 
-        failed "$url
-Expected type: $expect_types
-Actually type: $real_type"
+        # 检查
+        if ! grep -Foq "|$real_type|" <<<"|$expect_types|"; then
+            failed "$url
+expected: $expect_types
+actually: $real_type"
+        fi
+    fi
+
+    # 如果要设置变量
+    if [ -n "$var_to_eval" ]; then
+        IFS=. read -r "${var_to_eval?}" "${var_to_eval}_warp" <<<"$real_type"
     fi
 }
 
@@ -316,78 +304,43 @@ fix_file_type() {
     # 所以不用mime判断
     # https://www.digipres.org/formats/sources/tika/formats/#application/gzip
 
-    # centos 7 上的 file 显示 qcow2 的 mime 为 application/octet-stream
-    # file debian-12-genericcloud-amd64.qcow2
-    # debian-12-genericcloud-amd64.qcow2: QEMU QCOW Image (v3), 2147483648 bytes
-    # file --mime debian-12-genericcloud-amd64.qcow2
-    # debian-12-genericcloud-amd64.qcow2: application/octet-stream; charset=binary
-
     # --extension 不靠谱
     # file -b /reinstall-tmp/img-test --mime-type
     # application/x-qemu-disk
     # file -b /reinstall-tmp/img-test --extension
     # ???
 
-    # 1. 删除,;#
-    # DOS/MBR boot sector; partition 1: ...
-    # gzip compressed data, was ...
-    # # ISO 9660 CD-ROM filesystem data... (有些 file 版本开头输出有井号)
+    # 有些 file 版本输出的是 # ISO 9660 CD-ROM filesystem data ，要去掉开头的井号
 
-    # 2. 删除开头的空格
-
-    # 3. 删除无意义的单词 POSIX, Unicode, UTF-8, ASCII
-    # POSIX tar archive (GNU)
-    # Unicode text, UTF-8 text
-    # UTF-8 Unicode text, with very long lines
-    # ASCII text
-
-    # 4. 下面两种都是 raw
+    # 下面两种都是 raw
     # DOS/MBR boot sector
     # x86 boot sector; partition 1: ...
-    sed -E \
-        -e 's/[,;#]//g' \
-        -e 's/^[[:space:]]*//' \
-        -e 's/(POSIX|Unicode|UTF-8|ASCII)//gi' \
-        -e 's/DOS\/MBR boot sector/raw/i' \
-        -e 's/x86 boot sector/raw/i' \
-        -e 's/Zstandard/zstd/i' \
-        -e 's/Windows imaging \(WIM\) image/wim/i' |
-        awk '{print $1}' | to_lower
+
+    sed 's/^# //' | awk '{print $1}' | to_lower |
+        sed -e 's,dos/mbr,raw,' -e 's,x86,raw,'
 }
 
-# 不用 file -z，因为
-# 1. file -z 只能看透一层
-# 2. alpine file -z 无法看透部分镜像（前1M），例如：
-# guajibao-win10-ent-ltsc-2021-x64-cn-efi.vhd.gz
-# guajibao-win7-sp1-ent-x64-cn-efi.vhd.gz
-# win7-ent-sp1-x64-cn-efi.vhd.gz
-# 还要注意 centos 7 没有 -Z 只有 -z
 file_enhanced() {
-    file=$1
+    local file=$1
+    local outside inside
 
-    full_type=
-    while true; do
-        type="$(file -b $file | fix_file_type)"
-        full_type="$type.$full_type"
-        case "$type" in
-        xz | gzip | zstd)
-            install_pkg "$type"
-            $type -dc <"$file" | head -c 1048576 >"$file.inside"
-            mv -f "$file.inside" "$file"
-            ;;
-        tar)
-            install_pkg "$type"
-            # 隐藏 gzip: unexpected end of file 提醒
-            tar xf "$file" -O 2>/dev/null | head -c 1048576 >"$file.inside"
-            mv -f "$file.inside" "$file"
-            ;;
-        *)
-            break
-            ;;
-        esac
-    done
-    # shellcheck disable=SC2001
-    echo "$full_type" | sed 's/\.$//'
+    outside=$(file -b $file | fix_file_type)
+
+    if [ "$outside" = "xz" ] || [ "$outside" = "gzip" ]; then
+        # 要安装 xz 或者 gzip，不然会报错
+        # ERROR:[xz: Wait failed, No child process]
+        install_pkg "$outside"
+
+        # 加 if 是为了避免以下情况（外面是xz，但是识别不到里面的东西，即使装了xz）,
+        # 即使 file 报错返回值也是 0
+        # [root@localhost ~]# file -bZ /reinstall-tmp/img-test
+        # ERROR:[xz: Unexpected end of input]
+        if inside="$(file -bZ $file | fix_file_type)" && ! grep -iq "^Error" <<<"$inside"; then
+            echo "$inside.$outside"
+            return
+        fi
+    fi
+    echo "$outside"
 }
 
 add_community_repo_for_alpine() {
@@ -463,7 +416,7 @@ is_virt() {
         if [ -z "$_is_virt" ]; then
             _is_virt=false
         fi
-        echo "VM: $_is_virt"
+        echo "vm: $_is_virt"
     fi
     $_is_virt
 }
@@ -692,7 +645,7 @@ get_windows_iso_links() {
                 ;;
             8.1)
                 case "$edition" in
-                '') ;; # massgrave 不提供 windows 8.1 家庭版链接
+                '') echo _ ;;
                 pro) echo pro ;;
                 enterprise) echo enterprise ;;
                 esac
@@ -773,7 +726,7 @@ get_windows_iso_links() {
     label_vlsc=$(get_label_vlsc)
     page=$(get_page)
 
-    page_url=https://massgrave.dev/windows_${page}_links
+    page_url=https://massgrave.dev/windows_${page}_links.html
 
     info "Find windows iso"
     echo "Version:    $version"
@@ -787,7 +740,7 @@ get_windows_iso_links() {
         error_and_exit "Not support find this iso. Check --image-name or set --iso manually."
     fi
 
-    curl -L "$page_url" | grep -ioP 'https://.*?.(iso|img)' >$tmp/win.list
+    curl -L "$page_url" | grep -ioP 'https://.*?.iso' >$tmp/win.list
 
     # 如果不是 ltsc ，应该先去除 ltsc 链接，否则最终链接有 ltsc 的
     # 例如查找 windows 10 iot enterprise，会得到
@@ -821,14 +774,14 @@ get_windows_iso_link() {
                     regex+="${i}_"
                 fi
             done
-            regex+=".*${arch_win}.*.(iso|img)"
+            regex+=".*${arch_win}.*.iso"
             regexs+=("$regex")
         done
     fi
 
     # vlsc
     if [ -n "$label_vlsc" ]; then
-        regex="sw_dvd[59]_win_${label_vlsc}_${version}.*${arch_win}_${full_lang}.*.(iso|img)"
+        regex="sw_dvd9_win_${label_vlsc}_${version}.*${arch_win}_${full_lang}.*.iso"
         regexs+=("$regex")
     fi
 
@@ -885,7 +838,7 @@ setos() {
     }
 
     setos_debian() {
-        is_debian_elts() {
+        is_debian_eol() {
             [ "$releasever" -le 10 ]
         }
 
@@ -907,14 +860,11 @@ setos() {
 
         if is_use_cloud_image; then
             # cloud image
-            # debian --ci 用此标记要是否要换 elts 源
-            # shellcheck disable=SC2034
-            is_debian_elts && elts=1 || elts=0
             is_virt && ci_type=genericcloud || ci_type=generic
             eval ${step}_img=$cdimage_mirror/cloud/$codename/latest/debian-$releasever-$ci_type-$basearch_alt.qcow2
         else
             # 传统安装
-            if is_debian_elts; then
+            if is_debian_eol; then
                 # https://github.com/tuna/issues/issues/1999
                 # nju 也没同步
                 if false && is_in_china; then
@@ -1067,7 +1017,7 @@ Continue?
             filename=$(curl -L $mirror | grep -oP "ubuntu-$releasever.*?-live-server-$basearch_alt.iso" | head -1)
             iso=$mirror/$filename
             # 在 ubuntu 20.04 上，file 命令检测 ubuntu 22.04 iso 结果是 DOS/MBR boot sector
-            test_url $iso 'iso raw'
+            test_url $iso 'iso|raw'
             eval ${step}_iso=$iso
 
             # ks
@@ -1118,8 +1068,8 @@ Continue?
         else
             # 传统安装
             # 该服务器文件缓存 miss 时会响应 206 + Location 头
-            # 但 curl 这种情况不会重定向，所以添加 text 类型让它不要报错
-            test_url $mirror/nixos-$releasever/store-paths.xz 'xz text'
+            # 但 curl 这种情况不会重定向，所以添加 ascii 类型让它不要报错
+            test_url $mirror/nixos-$releasever/store-paths.xz 'xz|ascii'
             eval ${step}_mirror=$mirror
         fi
     }
@@ -1143,7 +1093,7 @@ Continue?
             dir=releases/$basearch_alt/autobuilds/current-$prefix
             file=$(curl -L $mirror/$dir/latest-$prefix.txt | grep '.tar.xz' | awk '{print $1}')
             stage3=$mirror/$dir/$file
-            test_url $stage3 'tar.xz'
+            test_url $stage3 'xz'
             eval ${step}_img=$stage3
         fi
     }
@@ -1161,7 +1111,7 @@ Continue?
         if is_in_china; then
             mirror=https://mirror.sjtu.edu.cn/opensuse
         else
-            mirror=https://mirror.fcix.net/opensuse
+            mirror=https://provo-mirror.opensuse.org
         fi
 
         if [ "$releasever" = tumbleweed ]; then
@@ -1195,20 +1145,31 @@ Continue?
         # 注意 windows server 2008 r2 serverdatacenter 不用改
         image_name=${image_name/windows server 2008 server/windows longhorn server}
 
-        test_url "$iso" 'iso raw'
-        [ -n "$boot_wim" ] && test_url "$boot_wim" 'wim'
+        test_url $iso 'iso|raw'
         eval "${step}_iso='$iso'"
-        eval "${step}_boot_wim='$boot_wim'"
         eval "${step}_image_name='$image_name'"
     }
 
     # shellcheck disable=SC2154
     setos_dd() {
         # raw 包含 vhd
-        test_url $img 'raw raw.gzip raw.xz raw.zstd raw.tar.gzip raw.tar.xz raw.tar.zstd' img_type
+        test_url $img 'raw|raw.gzip|raw.xz' img_type
 
         if is_efi; then
             install_pkg hexdump
+
+            extract() {
+                case "$img_type_warp" in
+                '') cat "$1" ;;
+                xz | gzip)
+                    install_pkg $img_type_warp
+                    # xz/gzip -d 文件必须有正确的扩展名，否则报扩展名错误
+                    # 因此用 stdin
+                    "$img_type_warp" -dc <"$1"
+                    ;;
+                *) error_and_exit "warp type $img_type_warp not support." ;;
+                esac
+            }
 
             # openwrt 镜像 efi part type 不是 esp
             # 因此改成检测 fat?
@@ -1221,7 +1182,7 @@ Continue?
 
             # 仅打印前34个扇区 * 4096字节（按最大的算）
             # 每行128字节
-            hexdump -n $((34 * 4096)) -e '128/1 "%02x" "\n"' -v "$tmp/img-test" >$tmp/img-test-hex
+            extract "$tmp/img-test" | hexdump -n $((34 * 4096)) -e '128/1 "%02x" "\n"' -v >$tmp/img-test-hex
             if grep -q '^28732ac11ff8d211ba4b00a0c93ec93b' $tmp/img-test-hex; then
                 echo 'DD: Image is EFI.'
             else
@@ -1266,9 +1227,9 @@ Continue with DD?
             "centos")
                 case $releasever in
                 "7")
-                    # CentOS-7-aarch64-GenericCloud.qcow2c 是旧版本
-                    ver=-2211
-                    ci_image=$ci_mirror/$releasever/images/CentOS-$releasever-$basearch-GenericCloud$ver.qcow2c
+                    # aarch64 需要特殊处理
+                    [ "$basearch" = aarch64 ] && ver=-2211 || ver=
+                    ci_image=$ci_mirror/$releasever/images/CentOS-$releasever-$basearch-GenericCloud$ver.qcow2
                     ;;
                 "9") ci_image=$ci_mirror/$releasever-stream/$basearch/images/CentOS-Stream-GenericCloud-$releasever-latest.$basearch.qcow2 ;;
                 esac
@@ -1409,7 +1370,7 @@ Continue with DD?
     # 集中测试云镜像格式
     if is_use_cloud_image && [ "$step" = finalos ]; then
         # shellcheck disable=SC2154
-        test_url $finalos_img 'qemu qemu.gzip qemu.xz qemu.zstd' finalos_img_type
+        test_url $finalos_img 'qemu|qemu.gzip|qemu.xz' finalos_img_type
     fi
 }
 
@@ -1446,7 +1407,7 @@ verify_os_name() {
         'redhat      8|9' \
         'opencloudos 8|9' \
         'oracle      7|8|9' \
-        'fedora      40|41' \
+        'fedora      39|40' \
         'nixos       24.05' \
         'debian      9|10|11|12' \
         'openeuler   20.03|22.03|24.03' \
@@ -1582,12 +1543,6 @@ install_pkg() {
             pacman) pkg="bind" ;;
             apk | emerge) pkg="bind-tools" ;;
             yum | dnf | zypper) pkg="bind-utils" ;;
-            esac
-            ;;
-        iconv)
-            case "$pkg_mgr" in
-            apk) pkg="musl-utils" ;;
-            *) error_and_exit "Which GNU/Linux do not have iconv built-in?" ;;
             esac
             ;;
         *) pkg=$cmd ;;
@@ -1750,12 +1705,6 @@ check_ram() {
         fi
     fi
 
-    # 用于兜底，不太准确
-    if [ -z $ram_size ]; then
-        ram_size=$(free -m | grep ^Mem: | awk '{print $2}')
-        ram_size=$((ram_size + 64 + 4))
-    fi
-
     if [ -z $ram_size ] || [ $ram_size -le 0 ]; then
         error_and_exit "Could not detect RAM size."
     fi
@@ -1846,99 +1795,6 @@ del_cr() {
 
 del_empty_lines() {
     sed '/^[[:space:]]*$/d'
-}
-
-prompt_password() {
-    while true; do
-        IFS= read -r -p "Password [$DEFAULT_PASSWORD]: " password
-        IFS= read -r -p "Retype password [$DEFAULT_PASSWORD]: " password_confirm
-        password=${password:-$DEFAULT_PASSWORD}
-        password_confirm=${password_confirm:-$DEFAULT_PASSWORD}
-        if [ -z "$password" ]; then
-            error "Passwords is empty. Try again."
-        elif [ "$password" != "$password_confirm" ]; then
-            error "Passwords don't match. Try again."
-        else
-            break
-        fi
-    done
-}
-
-save_password() {
-    dir=$1
-
-    # mkpasswd 有三个
-    # expect 里的 mkpasswd 是用来生成随机密码的
-    # whois 里的 mkpasswd 才是我们想要的，可能不支持 yescrypt，alpine 的 mkpasswd 是独立的包
-    # busybox 里的 mkpasswd 也是我们想要的，但多数不支持 yescrypt
-
-    # alpine 这两个包有冲突
-    # apk add expect mkpasswd
-
-    # 不要用 echo "$password" 保存密码，原因：
-    # password="-n"
-    # echo "$password"  # 空白
-
-    # 明文密码
-    # 假如用户运行 alpine live 直接打包硬盘镜像，如果保存了明文密码，则会暴露明文密码，因为 netboot initrd 在里面
-    # 通过 --password 传入密码，history 有记录，也会暴露明文密码
-    # /reinstall.log 也会暴露明文密码（已处理）
-    if false; then
-        printf '%s' "$password" >>"$dir/password-plaintext"
-    fi
-
-    # sha512
-    # 以下系统均支持 sha512 密码，但是生成密码需要不同的工具
-    # 兼容性     openssl   mkpasswd          busybox  python
-    # centos 7     ×      只有expect的       需要编译    √
-    # centos 8     √      只有expect的
-    # debian 9     ×         √
-    # ubuntu 16    ×         √
-    # alpine       √      可能系统装了expect     √
-    # cygwin       √
-    # others       √
-
-    # alpine
-    if is_have_cmd busybox && busybox mkpasswd --help 2>&1 | grep -wq sha512; then
-        crypted=$(printf '%s' "$password" | busybox mkpasswd -m sha512)
-    # others
-    elif install_pkg openssl && openssl passwd --help 2>&1 | grep -wq '\-6'; then
-        crypted=$(printf '%s' "$password" | openssl passwd -6 -stdin)
-    # debian 9 / ubuntu 16
-    elif is_have_cmd apt-get && install_pkg whois && mkpasswd -m help | grep -wq sha-512; then
-        crypted=$(printf '%s' "$password" | mkpasswd -m sha-512 --stdin)
-    # centos 7
-    # crypt.mksalt 是 python3 的
-    # 红帽把它 backport 到了 centos7 的 python2 上
-    # 在其它发行版的 python2 上运行会出错
-    elif is_have_cmd yum && is_have_cmd python2; then
-        crypted=$(python2 -c "import crypt, sys; print(crypt.crypt(sys.argv[1], crypt.mksalt(crypt.METHOD_SHA512)))" "$password")
-    else
-        error_and_exit "Could not generate sha512 password."
-    fi
-    echo "$crypted" >"$dir/password-linux-sha512"
-
-    # yescrypt
-    # 旧系统不支持，先不管
-    if false; then
-        if mkpasswd -m help | grep -wq yescrypt; then
-            crypted=$(printf '%s' "$password" | mkpasswd -m yescrypt --stdin)
-            echo "$crypted" >"$dir/password-linux-yescrypt"
-        fi
-    fi
-
-    # windows
-    if [ "$distro" = windows ] || [ "$distro" = dd ]; then
-        install_pkg iconv
-
-        # 要分两行写，因为 echo "$(xxx)" 返回值始终为 0，出错也不会中断脚本
-        # grep . 为了保证脚本没有出错
-        base64=$(printf '%s' "${password}Password" | iconv -f UTF-8 -t UTF-16LE | base64 -w 0 | grep .)
-        echo "$base64" >"$dir/password-windows-user-base64"
-
-        base64=$(printf '%s' "${password}AdministratorPassword" | iconv -f UTF-8 -t UTF-16LE | base64 -w 0 | grep .)
-        echo "$base64" >"$dir/password-windows-administrator-base64"
-    fi
 }
 
 # 记录主硬盘
@@ -2334,7 +2190,7 @@ install_grub_linux_efi() {
         if is_in_china; then
             mirror=https://mirror.sjtu.edu.cn/opensuse
         else
-            mirror=https://mirror.fcix.net/opensuse
+            mirror=https://provo-mirror.opensuse.org
         fi
 
         [ "$basearch" = x86_64 ] && ports='' || ports=/ports/$basearch
@@ -2459,11 +2315,6 @@ find_grub_extlinux_cfg() {
     fi
 }
 
-# 空格、&、用户输入的网址要加引号，否则 grub 无法正确识别
-is_need_quote() {
-    [[ "$1" = *' '* ]] || [[ "$1" = *'&'* ]] || [[ "$1" = http* ]]
-}
-
 # 转换 finalos_a=1 为 finalos.a=1 ，排除 finalos_mirrorlist
 build_finalos_cmdline() {
     if vars=$(compgen -v finalos_); then
@@ -2471,9 +2322,7 @@ build_finalos_cmdline() {
             value=${!key}
             key=${key#finalos_}
             if [ -n "$value" ] && [ $key != "mirrorlist" ]; then
-                is_need_quote "$value" &&
-                    finalos_cmdline+=" finalos_$key='$value'" ||
-                    finalos_cmdline+=" finalos_$key=$value"
+                finalos_cmdline+=" finalos_$key='$value'"
             fi
         done
     fi
@@ -2485,13 +2334,10 @@ build_extra_cmdline() {
     # 会将 extra.xxx=yyy 写入新系统的 /etc/modprobe.d/local.conf
     # https://answers.launchpad.net/ubuntu/+question/249456
     # https://salsa.debian.org/installer-team/rootskel/-/blob/master/src/lib/debian-installer-startup.d/S02module-params?ref_type=heads
-    for key in confhome hold force force_old_windows_setup cloud_image main_disk elts \
-        ssh_port rdp_port web_port allow_ping; do
+    for key in confhome hold force cloud_image main_disk; do
         value=${!key}
         if [ -n "$value" ]; then
-            is_need_quote "$value" &&
-                extra_cmdline+=" extra_$key='$value'" ||
-                extra_cmdline+=" extra_$key=$value"
+            extra_cmdline+=" extra_$key='$value'"
         fi
     done
 
@@ -2537,8 +2383,8 @@ build_nextos_cmdline() {
         nextos_cmdline+=" mirror/http/hostname=$nextos_hostname"
         nextos_cmdline+=" mirror/http/directory=/$nextos_directory"
         nextos_cmdline+=" base-installer/kernel/image=$nextos_kernel"
-        # elts 的 debian 不能用 security 源，否则安装过程会提示无法访问
-        if [ "$nextos_distro" = debian ] && is_debian_elts; then
+        # eol 的 debian 不能用 security 源，否则安装过程会提示无法访问
+        if [ "$nextos_distro" = debian ] && is_debian_eol; then
             nextos_cmdline+=" apt-setup/services-select="
         fi
         # kali 安装好后网卡是 eth0 这种格式，但安装时不是
@@ -2768,7 +2614,7 @@ EOF
         chmod a+x cdrom/simple-cdd/kali.postinst
     fi
 
-    if [ "$distro" = debian ] && is_debian_elts; then
+    if [ "$distro" = debian ] && is_debian_eol; then
         curl -Lo usr/share/keyrings/debian-archive-keyring.gpg https://deb.freexian.com/extended-lts/archive-key.gpg
     fi
 
@@ -2842,7 +2688,7 @@ EOF
     # hack 3
     # 修改 trans.sh
     # 1. 直接调用 create_ifupdown_config
-    insert_into_file $initrd_dir/trans.sh after '^: main' <<EOF
+    insert_into_file $initrd_dir/trans.sh after ': main' <<EOF
         distro=$nextos_distro
         create_ifupdown_config /etc/network/interfaces
         exit
@@ -2853,17 +2699,13 @@ EOF
     # 5. debian 11/12 initrd 无法识别 < <
     # 6. debian 11 initrd 无法识别 set -E
     # 7. debian 11 initrd 无法识别 trap ERR
-    # 8. debian 9 initrd 无法识别 ${string//find/replace}
     # 删除或注释，可能会导致空方法而报错，因此改为替换成'\n: #'
     replace='\n: #'
-    sed -Ei \
-        -e "s/> >/$replace/" \
-        -e "s/< </$replace/" \
-        -e "s/^[[:space:]]*apk[[:space:]]/$replace/" \
-        -e "s/^[[:space:]]*trap[[:space:]]/$replace/" \
-        -e "s/\\$\{.*\/\/.*\/.*\}/$replace/" \
-        -e "/^[[:space:]]*set[[:space:]]/s/E//" \
-        $initrd_dir/trans.sh
+    sed -Ei "s/> >/$replace/" $initrd_dir/trans.sh
+    sed -Ei "s/< </$replace/" $initrd_dir/trans.sh
+    sed -Ei "s/(^[[:space:]]*set[[:space:]].*)E/\1/" $initrd_dir/trans.sh
+    sed -Ei "s/^[[:space:]]*apk[[:space:]]/$replace/" $initrd_dir/trans.sh
+    sed -Ei "s/^[[:space:]]*trap[[:space:]]/$replace/" $initrd_dir/trans.sh
 }
 
 get_disk_drivers() {
@@ -3044,15 +2886,11 @@ EOF
     # ssl_client: SSL_connect
     # wget: bad header line: �
     insert_into_file init before '^exec (/bin/busybox )?switch_root' <<EOF
-        # trans
         # echo "wget --no-check-certificate -O- $confhome/trans.sh | /bin/ash" >\$sysroot/etc/local.d/trans.start
         # wget --no-check-certificate -O \$sysroot/etc/local.d/trans.start $confhome/trans.sh
         cp /trans.sh \$sysroot/etc/local.d/trans.start
         chmod a+x \$sysroot/etc/local.d/trans.start
         ln -s /etc/init.d/local \$sysroot/etc/runlevels/default/
-
-        # 配置文件夹
-        cp -r  /configs \$sysroot/configs
 EOF
 
     # 判断云镜像 debain 能否用云内核
@@ -3091,18 +2929,13 @@ mod_initrd() {
         $(is_in_windows && echo --nonmatching 'dev/console' --nonmatching 'dev/null')
 
     curl -Lo $initrd_dir/trans.sh $confhome/trans.sh
-    if ! grep -iq "$SCRIPT_VERSION" $initrd_dir/trans.sh; then
+    if ! grep -i "$SCRIPT_VERSION" $initrd_dir/trans.sh; then
         error_and_exit "
 This script is outdated, please download reinstall.sh again.
 脚本有更新，请重新下载 reinstall.sh"
     fi
-
     curl -Lo $initrd_dir/alpine-network.sh $confhome/alpine-network.sh
     chmod a+x $initrd_dir/trans.sh $initrd_dir/alpine-network.sh
-
-    # 保存配置
-    mkdir -p $initrd_dir/configs
-    save_password $initrd_dir/configs
 
     if is_distro_like_debian $nextos_distro; then
         mod_initrd_debian_kali
@@ -3207,29 +3040,9 @@ else
     fi
 fi
 
-long_opts=
-for o in ci installer debug minimal allow-ping \
-    hold: sleep: \
-    iso: \
-    image-name: \
-    boot-wim: \
-    img: \
-    lang: \
-    passwd: password: \
-    ssh-port: \
-    rdp-port: \
-    web-port: http-port: \
-    allow-ping: \
-    commit: \
-    force: \
-    force-old-windows-setup:; do
-    [ -n "$long_opts" ] && long_opts+=,
-    long_opts+=$o
-done
-
 # 整理参数
-if ! opts=$(getopt -n $0 -o "" --long "$long_opts" -- "$@"); then
-    exit
+if ! opts=$(getopt -n $0 -o "" --long ci,installer,debug,minimal,hold:,sleep:,iso:,image-name:,img:,lang:,commit:,force: -- "$@"); then
+    usage_and_exit
 fi
 
 eval set -- "$opts"
@@ -3258,46 +3071,18 @@ while true; do
         minimal=1
         shift
         ;;
-    --allow-ping)
-        allow_ping=1
-        shift
-        ;;
     --hold | --sleep)
-        if ! { [ "$2" = 1 ] || [ "$2" = 2 ]; }; then
-            error_and_exit "Invalid $1 value: $2"
-        fi
         hold=$2
+        if ! { [ "$hold" = 1 ] || [ "$hold" = 2 ]; }; then
+            error_and_exit "Invalid --hold value: $hold."
+        fi
         shift 2
         ;;
     --force)
-        if ! { [ "$2" = bios ] || [ "$2" = efi ]; }; then
-            error_and_exit "Invalid $1 value: $2"
-        fi
         force=$2
-        shift 2
-        ;;
-    --passwd | --password)
-        [ -n "$2" ] || error_and_exit "Need value for $1"
-        password=$2
-        shift 2
-        ;;
-    --ssh-port)
-        is_port_valid $2 || error_and_exit "Invalid $1 value: $2"
-        ssh_port=$2
-        shift 2
-        ;;
-    --rdp-port)
-        is_port_valid $2 || error_and_exit "Invalid $1 value: $2"
-        rdp_port=$2
-        shift 2
-        ;;
-    --web-port | --http-port)
-        is_port_valid $2 || error_and_exit "Invalid $1 value: $2"
-        web_port=$2
-        shift 2
-        ;;
-    --force-old-windows-setup)
-        force_old_windows_setup=$2
+        if ! { [ "$force" = bios ] || [ "$force" = efi ]; }; then
+            error_and_exit "Invalid --force value: $force."
+        fi
         shift 2
         ;;
     --img)
@@ -3306,10 +3091,6 @@ while true; do
         ;;
     --iso)
         iso=$2
-        shift 2
-        ;;
-    --boot-wim)
-        boot_wim=$2
         shift 2
         ;;
     --image-name)
@@ -3343,21 +3124,6 @@ assert_not_in_container
 # 不支持安全启动
 if is_secure_boot_enabled; then
     error_and_exit "Please disable secure boot first."
-fi
-
-# 密码
-if ! is_netboot_xyz && [ -z "$password" ]; then
-    if is_use_dd; then
-        echo "
-This password is only used for SSH access to view logs during the DD process.
-Password of the image will NOT modify.
-
-密码仅用于 DD 过程中通过 SSH 查看日志。
-镜像的密码不会被修改。
-"
-
-    fi
-    prompt_password
 fi
 
 # 必备组件
@@ -3793,7 +3559,7 @@ if ! { is_netboot_xyz || is_use_dd; }; then
         username="root"
     fi
     echo "Username: $username"
-    echo "Password: $password"
+    echo "Password: 123@@@"
 fi
 
 if is_netboot_xyz; then
