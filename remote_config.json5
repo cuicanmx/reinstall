@@ -1,0 +1,600 @@
+{
+	"server": {
+		"setting": {
+			"lowSpeedDelay": 200
+		},
+		"compatible": {
+			"connect": {
+				"218.18.106.132:443": {
+					"ssl": true
+				}
+			},
+			"request": {
+				"218.18.106.132:443": {
+					"rejectUnauthorized": false
+				}
+			}
+		},
+		"intercepts": {
+			// github相关
+			"github.com": {
+				"^(/[^/]+){2,}/?(\\?.*)?$": {
+					"tampermonkeyScript": "https://gitee.com/wangliang181230/dev-sidecar/raw/scripts/tampermonkey.js",
+					"script": "https://gitee.com/wangliang181230/dev-sidecar/raw/scripts/GithubEnhanced-High-Speed-Download.user.js",
+					"remark": "注：上面所使用的脚本地址，为高速镜像地址。",
+					"desc": "油猴脚本：高速下载 Git Clone/SSH、Release、Raw、Code(ZIP) 等文件 (公益加速)、项目列表单文件快捷下载、添加 git clone 命令"
+				},
+				"^(/[\\w-.]+){2,}/?(\\?.*)?$": null,
+				"^(/[^/]+){2}/releases/download/.*$": {
+					"redirect": "ghp.ci/https://github.com",
+					"desc": "release文件加速下载重定向地址"
+				},
+				"^(/[^/]+){2}/archive/.*\\.(zip|tar.gz)$": {
+					"redirect": "ghp.ci/https://github.com",
+					"desc": "release源代码加速下载重定向地址"
+				},
+				// 以下配置会导致私有(private)仓库中的图片无法加载，因为需要有一个token参数，无法在DS中生成，暂不配置
+				//"^((/[^/]+){2})/raw/(refs/heads/)?(.*)$": {
+				//	"proxy": "https://raw.githubusercontent.com${m[1]}/${m[4]}",
+				//	"sni": "baidu.com",
+				//	"requestReplace": {
+				//		"headers": {
+				//			"cookie": "[remove]",
+				//			"user-agent": "[remove]"
+				//		}
+				//	}
+				//},
+				"^((/[^/]+){2,})/raw((/[^/]+)+\\.(jpg|jpeg|png|gif))(\\?.*)?$": {
+					"proxy": null,
+					"sni": null,
+					"cacheDays": 365,
+					"desc": "仓库内图片重定向，缓存1年。"
+				},
+				"^((/[^/]+){2,})/raw((/[^/]+)+\\.js)(\\?.*)?$": {
+					"proxy": null,
+					"sni": null,
+					"responseReplace": { "headers": { "content-type": "application/javascript; charset=utf-8" } },
+					"desc": "仓库内脚本，设置响应头Content-Type。作用：方便script拦截器直接使用，避免引起跨域问题和脚本内容限制问题。"
+				}
+			},
+			"api.github.com": {
+				".*": {
+					"sni": "baidu.com"
+				}
+			},
+			"github.githubassets.com": {
+				"^(/[^/]+)*/[^./]+\\.(svg|png|gif|jpg|jpeg|ico|js|css)(\\?.*)?$": {
+					"cacheDays": 365,
+					"desc": "图片、JS文件、CSS文件，缓存1年"
+				},
+				".*": {
+					"proxy": "github.com",
+					"sni": "baidu.com",
+					"responseReplace": {
+						"headers": {
+							"access-control-allow-origin": "*",
+							"cross-origin-resource-policy": "cross-origin",
+							"set-cookie": "[remove]"
+						}
+					}
+				}
+			},
+			"opengraph.githubassets.com": {
+				"^/(([^/]+/){3}issues/\\d+)?(\\?.*)?$": {
+					"cacheDays": 365
+				},
+				".*": {
+					"sni": "baidu.com"
+				}
+			},
+			"*.githubusercontent.com": {
+				".*": {
+					"sni": "baidu.com"
+				}
+			},
+			"github-releases.githubusercontent.com": null,
+			"camo.githubusercontent.com": { ".*": null },
+			"raw.githubusercontent.com": null,
+			"avatars.githubusercontent.com": { ".*": null },
+			"user-images.githubusercontent.com": { ".*": null },
+			"private-user-images.githubusercontent.com": {
+				".*": null,
+				"^/.*\\.png(\\?.*)?$": {
+					"cacheDays": 30,
+					"cacheHours": null,
+					"desc": "用户在PR或issue等内容中上传的图片，缓存30天"
+				}
+			},
+			"collector.github.com": {
+				"/github/collect": {
+					"success": true,
+					"status": 204,
+					"desc": "采集数据，快速成功"
+				},
+				".*": {
+					"sni": "baidu.com"
+				}
+			},
+			"*.gravatar.com": {
+				".*": {
+					"sni": "baidu.com"
+				}
+			},
+			"*.windows.net": {
+				".*": {
+					"sni": "baidu.com"
+				}
+			},
+
+			// google相关
+			"www.gstatic.com": {
+				"/recaptcha/.*": {
+					"proxy": "www.recaptcha.net"
+				}
+			},
+			"fonts.googleapis.com": {
+				".*": {
+					//"proxy": "fonts.geekzu.org", // 已失效
+					"proxy": "fonts.loli.net",
+					"backup": null
+				}
+			},
+
+			// Docker Hub站点所需配置
+			"www.docker.com": {
+				".*": {
+					"sni": "www.docker.com" // 配置它自己是为了覆盖 *.docker.com 中的SNI配置，此配置优先级更高
+				}
+			},
+			"login.docker.com": {
+				".*": {
+					"sni": "login.docker.com" // 配置它自己是为了覆盖 *.docker.com 中的SNI配置，此配置优先级更高
+				}
+			},
+
+			// Pixiv站点所需SNI配置（结合预设IP中的配置，可直连访问Pixiv站点）
+			"*.pixiv.net": {
+				".*": {
+					"sni": "baidu.com"
+				}
+			},
+			"*.pixiv.org": {
+				".*": {
+					"sni": "baidu.com"
+				}
+			},
+			"*.pximg.net": {
+				".*": {
+					"sni": "baidu.com"
+				}
+			},
+			"*.ads-pixiv.net": {
+				".*": {
+					"sni": "baidu.com"
+				}
+			},
+			"*.nikke-global.com": {
+				".*": {
+					"sni": "baidu.com"
+				}
+			},
+			"i.pximg.net": {
+				".*": {
+					"cacheDays": 365,
+					"requestReplace": {
+						"headers": {
+							"referer": "https://www.pixiv.net/"
+						},
+						"desc": "篡改请求头'Referer'，使Pixiv图片链接可以单独在浏览器打开"
+					}
+				}
+			},
+
+			// ChatGPT站点所需的拦截配置
+			"chatgpt.com": {
+				"^/backend-api/conversation(\\?.*)?$": {
+					"requestReplace": {
+						"headers": {
+							"oai-device-id": "[remove]"
+						},
+						"desc": "解决提问后得不到回答的问题；如果还存在问题，请清理浏览器所有cookie和缓存，重新登录后再试，应该就可以了"
+					}
+				}
+			},
+
+			// jsdelivr静态资源的拦截配置
+			"cdn.jsdelivr.net": {
+				"^/.*\\.(js|css|png|jpg|jpeg|gif)(\\?.*)?$": {
+					"proxy": "fastly.jsdelivr.net",
+					"backup": [
+						"gcore.jsdelivr.net"
+					]
+				}
+			},
+
+			// 其它站点
+			"*.msecnd.net": {
+				".*": {
+					"sni": "baidu.com"
+				}
+			},
+
+			// DS_DOWNLOAD配置
+			"jsd.proxy.aks.moe": {
+				"^.*\\?DS_DOWNLOAD$": {
+					"requestReplace": { "doDownload": true },
+					"responseReplace": { "doDownload": true }
+				}
+			},
+			"fastly.jsdelivr.net": {
+				"^.*\\?DS_DOWNLOAD$": {
+					"requestReplace": { "doDownload": true },
+					"responseReplace": { "doDownload": true }
+				}
+			},
+			"jsdelivr.pai233.top": {
+				"^.*\\?DS_DOWNLOAD$": {
+					"requestReplace": { "doDownload": true },
+					"responseReplace": { "doDownload": true }
+				}
+			},
+			"raw.incept.pw": {
+				"^.*\\?DS_DOWNLOAD$": {
+					"requestReplace": { "doDownload": true },
+					"responseReplace": { "doDownload": true }
+				}
+			},
+
+			// 删除配置
+			"*": null
+		},
+		"preSetIpList": {
+			"github.com": [
+				"4.237.22.38",
+				"20.26.156.215",
+				"20.27.177.113",
+				"20.87.245.0",
+				"20.200.245.247",
+				"20.201.28.151",
+				"20.205.243.166",
+				"140.82.113.3",
+				"140.82.114.4",
+				"140.82.116.3",
+				"140.82.116.4",
+				"140.82.121.3",
+				"140.82.121.4"
+			],
+			"*.githubusercontent.com": [
+				"146.75.92.133",
+				"199.232.144.133",
+				"199.232.88.133"
+			],
+			"viewscreen.githubusercontent.com": [
+				"140.82.112.21",
+				"140.82.112.22",
+				"140.82.113.21",
+				"140.82.113.22",
+				"140.82.114.21",
+				"140.82.114.22"
+			],
+			"^(analytics|ghcc)\\.githubassets\\.com$": [
+				"185.199.108.153",
+				"185.199.110.153",
+				"185.199.109.153",
+				"185.199.111.153"
+			],
+			"*.githubassets.com": [
+				"185.199.108.154",
+				"185.199.109.154",
+				"185.199.110.154",
+				"185.199.111.154"
+			],
+			"github.githubassets.com": null,
+			"*.pixiv.net": [
+				// 以下为 `cdn-origin.pixiv.net` 域名的IP
+				"210.140.139.154",
+				"210.140.139.157",
+				"210.140.139.160"
+			],
+			"hub.docker.com": [
+				"44.221.37.199",
+				"52.44.227.212",
+				"54.156.140.159"
+			],
+			"sessions-bugsnag.docker.com": [
+				"44.221.37.199",
+				"52.44.227.212",
+				"54.156.140.159"
+			]
+		},
+		"dns": {
+			"mapping": {
+				"*.jetbrains.com": "quad9",
+				"*.azureedge.net": "quad9",
+				"*.stackoverflow.com": "quad9",
+
+				// Pixiv站点相关
+				"*.pixiv.org": "quad9",
+				"*.pximg.net": "quad9",
+				"*.onesignal.com": "cloudflare"
+			},
+			"speedTest": {
+				"interval": 60000
+			}
+		},
+		"whiteList": {
+			"*.icloud.com": true,
+			"*.lenovo.net": true,
+
+			// 本地
+			"localhost": true,
+			"127.*.*.*": true,
+			"192.168.*.*": true,
+
+			// 删除配置
+			"192.168.*": null
+		}
+	},
+	"proxy": {
+		"remoteDomesticDomainAllowListFileUrl": "https://ghp.ci/https://raw.githubusercontent.com/pluwen/china-domain-allowlist/main/allow-list.sorl",
+		"excludeIpList": {
+			// Github文件上传所使用的域名，被DS代理会导致文件上传经常失败，从系统代理中排除掉
+			"objects-origin.githubusercontent.com": true,
+			// Github下载release文件的高速镜像地址
+			"*.ghproxy.net": true,
+			"*.ghp.ci": true,
+			"*.kkgithub.com": true,
+			"*.dgithub.xyz": true,
+
+			// Github建站域名
+			"*.github.io": true,
+			"pages.github.com": true,
+
+			// Github帮助、文档页
+			"help.github.com": true,
+			"docs.github.com": true,
+
+			// Github部分未被GFW拦截的域名
+			"*.github.blog": true,
+			"analytics.githubassets.com": true,
+			"ghcc.githubassets.com": true,
+
+			// DockerHub站点相关
+			"www.docker.com": true,
+			"login.docker.com": true,
+			"api.dso.docker.com": true,
+			"desktop.docker.com": true,
+
+			// Elastic相关
+			"*.elastic.co": true,
+
+			// bilibili相关
+			"*.bilicomic.com": true,
+
+			// 中国移动云盘登录API
+			"[2049:8c54:813:10c::140]": true,
+			"[2409:8a0c:a442:ff40:a51f:4b9c:8b41:25ea]": true,
+			"[2606:2800:147:120f:30c:1ba0:fc6:265a]": true,
+			// 移动云盘相关
+			"*.cmicapm.com": true,
+
+			// cloudflare：排除以下域名，cloudflare的人机校验会更快，成功率更高。
+			"*.cloudflare.com": true,
+			"*.cloudflare-cn.com": true,
+
+			// VS相关
+			"*.microsoftonline.com": true, // 此域名不排除的话，部分功能将出现异常
+			"*.msedge.net": true,
+
+			// 卡巴斯基升级域名
+			"*kaspersky*.com": true,
+			"*.upd.kaspersky.com": true,
+
+			// sandbox沙盒域名
+			"*.sandboxie-plus.com": true,
+
+			// 无忧论坛
+			"*.wuyou.net": true,
+
+			// python建图包域名（浏览器）
+			"*.pyecharts.org": true,
+
+			// 教育网站
+			"*.bcloudlink.com": true,
+
+			// 奇迹秀（资源）
+			"*.qijishow.com": true,
+
+			// Z-Library
+			"*.z-lib.fo": true,
+
+			// Finalshell（Linux学习网）
+			"*.finalshell.com": true,
+
+			// MineBBS（我的世界中文论坛）
+			"*.minebbs.com": true,
+
+			// 我的世界插件网
+			"*.spigotmc.org": true,
+
+			// bd测试
+			"*.virustotal.com": true,
+
+			// Gitlab
+			"*.gitlab.com" : true,
+
+			// 未知
+			"*.youdemai.com": true,
+			"*.casualthink.com": true,
+			"44.239.165.12": true,
+			"3.164.110.117": true,
+
+			// 移除配置
+			"challenges.cloudflare.com": null
+		}
+	},
+	"plugin": {
+		"overwall": {
+			"targets": {
+				"*.github.com": true,
+				"*github*.com": true,
+				"*.gitbook.io": true,
+				"*.nodejs.org": true,
+				"*.npmjs.com": true,
+				"*.wikimedia.org": true,
+				"*.v2ex.com": true,
+				"*.azureedge.net": true,
+				"*.cloudfront.net": true,
+				"*.bing.com": true,
+				"*.discourse-cdn.com": true,
+				"*.gravatar.com": true,
+				"*.docker.com": true,
+				"*.vueuse.org": true,
+				"*.elastic.co": true,
+				"*.optimizely.com": true,
+				"*.stackpathcdn.com": true,
+				"*.fastly.net": true,
+				"*.cloudflare.com": true,
+				"*.233v2.com": true,
+				"*.v2fly.org": true,
+				"*.telegram.org": true,
+				"*.amazon.com": true,
+				"*.googleapis.com": true,
+				"*.google-analytics.com": true,
+				"*.cloudflareinsights.com": true,
+				"*.intlify.dev": true,
+				"*.segment.io": true,
+				"*.shields.io": true,
+				"*.jsdelivr.net": true,
+				"*.z-library.sk": true,
+				"*.zlibrary*.se": true,
+
+				// 维基百科
+				"*.wikipedia-on-ipfs.org": true,
+
+				// ChatGPT
+				"*.oaiusercontent.com": true, // 在ChatGPT中生成文件并下载所需的域名
+
+				// Pixiv相关
+				"*.pixiv.org": true,
+				"*.fanbox.cc": true,
+				"*.onesignal.com": true // pixiv站点，会加载该域名下的js脚本
+			},
+			"pac": {
+				"pacFileUpdateUrl": "https://ghp.ci/https://raw.githubusercontent.com/gfwlist/gfwlist/master/gfwlist.txt"
+			}
+		}
+	},
+	"help": {
+		"dataList": [
+			{
+				"title": "一、功能说明",
+				"rowClass": "title1",
+				"children": [
+					{
+						"title": "> 功能太多，点击前往Wiki页面查看",
+						"url": "https://github.com/docmirror/dev-sidecar/wiki"
+					}
+				]
+			},
+			{
+				"title": "二、问题处理",
+				"rowClass": "title1",
+				"children": [
+					{
+						"title": "1、Linux安装证书失败的避坑",
+						"url": "https://github.com/docmirror/dev-sidecar/issues/238"
+					},
+					{
+						"title": "2、解决Linux（deb）系统下无法安装根证书的问题",
+						"url": "https://github.com/docmirror/dev-sidecar/issues/135"
+					},
+					{
+						"title": "3、在Arch/Fedora下的证书安装",
+						"url": "https://github.com/docmirror/dev-sidecar/issues/204"
+					},
+					{
+						"title": "4、在 WSL 中的使用方法",
+						"url": "https://github.com/docmirror/dev-sidecar/issues/73"
+					},
+					{
+						"title": "> 点击前往Issue区查找更多帮助信息",
+						"url": "https://github.com/docmirror/dev-sidecar/issues"
+					}
+				]
+			},
+			{
+				"title": "三、版本更新日志",
+				"rowClass": "title1",
+				"children": [
+					{
+						"title": "v2.0.x",
+						"rowClass": "title2",
+						"children": [
+							{
+								"title": "[ 2024-12-10 ] v2.0.0-RC1",
+								"url": "https://github.com/docmirror/dev-sidecar/releases/tag/v2.0.0-RC1"
+							}
+						]
+					},
+					{
+						"title": "v1.8.x",
+						"rowClass": "title2",
+						"children": [
+							{
+								"title": "[ 2024-11-07 ] v1.8.9",
+								"url": "https://github.com/docmirror/dev-sidecar/releases/tag/v1.8.9"
+							},
+							{
+								"title": "[ 2024-10-18 ] v1.8.8（紧急修复彩蛋BUG）",
+								"url": "https://github.com/docmirror/dev-sidecar/releases/tag/v1.8.8"
+							},
+							{
+								"title": "[ 2024-10-17 ] v1.8.7（存在彩蛋BUG，建议升级到 v1.8.8 及以上版本）",
+								"url": "https://github.com/docmirror/dev-sidecar/releases/tag/v1.8.7"
+							},
+							{
+								"title": "[ 2024-09-30 ] v1.8.6（存在彩蛋BUG，建议升级到 v1.8.8 及以上版本）",
+								"url": "https://github.com/docmirror/dev-sidecar/releases/tag/v1.8.6"
+							},
+							{
+								"title": "[ 2024-09-20 ] v1.8.5（存在彩蛋BUG，建议升级到 v1.8.8 及以上版本）",
+								"url": "https://github.com/docmirror/dev-sidecar/releases/tag/v1.8.5"
+							},
+							{
+								"title": "[ 2024-09-09 ] v1.8.4",
+								"url": "https://github.com/docmirror/dev-sidecar/releases/tag/v1.8.4"
+							},
+							{
+								"title": "[ 2024-08-27 ] v1.8.3",
+								"url": "https://github.com/docmirror/dev-sidecar/releases/tag/v1.8.3"
+							},
+							{
+								"title": "[ 2024-07-08 ] v1.8.2",
+								"url": "https://github.com/docmirror/dev-sidecar/releases/tag/v1.8.2"
+							},
+							{
+								"title": "[ 2024-04-28 ] v1.8.1",
+								"url": "https://github.com/docmirror/dev-sidecar/releases/tag/v1.8.1"
+							},
+							{
+								"title": "[ 2024-04-08 ] v1.8.0",
+								"url": "https://github.com/docmirror/dev-sidecar/releases/tag/v1.8.0"
+							}
+						]
+					},
+					{
+						"title": "v1.7.x",
+						"rowClass": "title2",
+						"children": [
+							{
+								"title": "[ 2022-03-14 ] v1.7.3",
+								"url": "https://github.com/docmirror/dev-sidecar/releases/tag/v1.7.3"
+							}
+						]
+					}
+				]
+			}
+		]
+	}
+}
